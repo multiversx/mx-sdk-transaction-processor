@@ -8,7 +8,7 @@ Transaction processor for JavaScript and TypeScript (written in TypeScript).
 
 ## Usage
 
-```
+```js
 let transactionProcessor = new TransactionProcessor();
 await transactionProcessor.start({
   onTransactionsReceived: (shardId, nonce, transactions) => {
