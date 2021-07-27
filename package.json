@@ -1,0 +1,25 @@
+{
+  "name": "@elrondnetwork/transaction-processor",
+  "version": "0.1.0",
+  "description": "Real-time transaction processor",
+  "main": "lib/transaction.processor.js",
+  "types": "lib/transaction.processor.d.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "keywords": [
+    "elrond",
+    "transaction",
+    "processor"
+  ],
+  "author": "ElrondNetwork",
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "@types/axios": "^0.14.0",
+    "typescript": "^4.3.5"
+  },
+  "dependencies": {
+    "axios": "^0.21.1"
+  }
+}
