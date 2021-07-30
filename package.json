@@ -1,6 +1,6 @@
 {
   "name": "@elrondnetwork/transaction-processor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Real-time transaction processor",
   "main": "lib/transaction.processor.js",
   "types": "lib/transaction.processor.d.ts",
