@@ -21,6 +21,8 @@ export class TransactionProcessor {
       this.shardIds = await this.getShards();
       this.startCurrentNonces = await this.getCurrentNonces();
 
+      let startLastProcessedNonces: { [ key: number ]: number } = {};
+
       let reachedTip: boolean;
 
       do {
@@ -28,20 +30,45 @@ export class TransactionProcessor {
 
         for (let shardId of this.shardIds) {
           let currentNonce = await this.estimateCurrentNonce(shardId);
-          let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId);
+          let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
 
-          if (lastProcessedNonce >= currentNonce) {
+          if (lastProcessedNonce === currentNonce) {
+            continue;
+          }
+
+          // this is to handle the situation where the current nonce is reset
+          // (e.g. devnet/testnet reset where the nonces start again from zero)
+          if (lastProcessedNonce > currentNonce) {
+            lastProcessedNonce = currentNonce;
+          }
+
+          if (options.maxLookBehind && currentNonce - lastProcessedNonce > options.maxLookBehind) {
+            lastProcessedNonce = currentNonce - options.maxLookBehind;
+          }
+
+          if (!startLastProcessedNonces[shardId]) {
+            startLastProcessedNonces[shardId] = lastProcessedNonce;
+          }
+
+          let nonce = lastProcessedNonce + 1;
+
+          let transactions = await this.getShardTransactions(shardId, nonce);
+          if (transactions === undefined) {
             continue;
           }
 
           reachedTip = false;
 
-          let nonce = lastProcessedNonce + 1;
-
-          let transactions = await this.getShardTransactions(shardId, nonce);
-
           if (transactions.length > 0) {
-            this.onTransactionsReceived(shardId, nonce, transactions);
+            let statistics = new TransactionStatistics();
+
+            statistics.secondsElapsed = (new Date().getTime() - this.startDate.getTime()) / 1000;
+            statistics.processedNonces = lastProcessedNonce - startLastProcessedNonces[shardId];
+            statistics.noncesPerSecond = statistics.processedNonces / statistics.secondsElapsed;
+            statistics.noncesLeft = currentNonce - lastProcessedNonce;
+            statistics.secondsLeft = statistics.noncesLeft / statistics.noncesPerSecond * 1.1;
+
+            await this.onTransactionsReceived(shardId, nonce, transactions, statistics);
           }
 
           this.setLastProcessedNonce(shardId, nonce);
@@ -62,8 +89,12 @@ export class TransactionProcessor {
     return result;
   };
 
-  private async getShardTransactions(shardId: number, nonce: number): Promise<ShardTransaction[]> {
+  private async getShardTransactions(shardId: number, nonce: number): Promise<ShardTransaction[] | undefined> {
     let result = await this.gatewayGet(`block/${shardId}/by-nonce/${nonce}?withTxs=true`);
+
+    if (!result || !result.block) {
+      return undefined;
+    }
 
     if (result.block.miniBlocks === undefined) {
       return [];
@@ -115,7 +146,7 @@ export class TransactionProcessor {
       let result = await axios.get(fullUrl);
       return result.data.data;
     } catch (error) {
-      console.error(`Error when getting from gateway url ${fullUrl}`, error);
+      // console.error(`Error when getting from gateway url ${fullUrl}`, error);
     }
   }
 
@@ -141,39 +172,39 @@ export class TransactionProcessor {
     return startCurrentNonce + roundsElapsedSinceStart;
   }
 
-  private async getLastProcessedNonceOrCurrent(shardId: number): Promise<number> {
-    let lastProcessedNonce = await this.getLastProcessedNonce(shardId);
-    if (lastProcessedNonce === undefined) {
-      lastProcessedNonce = this.startCurrentNonces[shardId] - 1;
+  private async getLastProcessedNonceOrCurrent(shardId: number, currentNonce: number): Promise<number> {
+    let lastProcessedNonce = await this.getLastProcessedNonce(shardId, currentNonce);
+    if (lastProcessedNonce === null || lastProcessedNonce === undefined) {
+      lastProcessedNonce = currentNonce - 1;
       await this.setLastProcessedNonce(shardId, lastProcessedNonce);
     }
 
     return lastProcessedNonce;
   }
 
-  private async getLastProcessedNonce(shardId: number): Promise<number | undefined> {
+  private async getLastProcessedNonce(shardId: number, currentNonce: number): Promise<number | undefined> {
     let getLastProcessedNonceFunc = this.options.getLastProcessedNonce;
     if (!getLastProcessedNonceFunc) {
       return this.lastProcessedNoncesInternal[shardId];
     }
 
-    return await getLastProcessedNonceFunc(shardId);
+    return await getLastProcessedNonceFunc(shardId, currentNonce);
   }
 
-  private async setLastProcessedNonce(shardId: number, nonce: number): Promise<number> {
+  private async setLastProcessedNonce(shardId: number, nonce: number) {
     let setLastProcessedNonceFunc = this.options.setLastProcessedNonce;
     if (!setLastProcessedNonceFunc) {
       this.lastProcessedNoncesInternal[shardId] = nonce;
-      return nonce;
+      return;
     }
 
-    return await setLastProcessedNonceFunc(shardId, nonce);
+    await setLastProcessedNonceFunc(shardId, nonce);
   }
   
-  private async onTransactionsReceived(shardId: number, nonce: number, transactions: ShardTransaction[]) {
+  private async onTransactionsReceived(shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics) {
     let onTransactionsReceivedFunc = this.options.onTransactionsReceived;
     if (onTransactionsReceivedFunc) {
-      onTransactionsReceivedFunc(shardId, nonce, transactions);
+      await onTransactionsReceivedFunc(shardId, nonce, transactions, statistics);
     }
   }
 }
@@ -190,9 +221,18 @@ export class ShardTransaction {
   nonce: number = 0;
 }
 
+export class TransactionStatistics {
+  secondsElapsed: number = 0;
+  processedNonces: number = 0;
+  noncesPerSecond: number = 0;
+  noncesLeft: number = 0;
+  secondsLeft: number = 0;
+}
+
 export class TransactionProcessorOptions {
   gatewayUrl?: string;
-  onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[]) => void = (_) => {};
-  getLastProcessedNonce?: (shardId: number) => Promise<number | undefined>;
-  setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<number>;
+  maxLookBehind?: number;
+  onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics) => Promise<void>;
+  getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
+  setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
 }
