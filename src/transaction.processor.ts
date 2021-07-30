@@ -8,6 +8,9 @@ export class TransactionProcessor {
   private readonly lastProcessedNoncesInternal: { [key: number]: number } = {};
   private isRunning: boolean = false;
 
+  private crossShardTransactionsCounterDictionary: { [ key: string ]: number } = {};
+  private crossShardTransactionsDictionary: { [ key: string ]: ShardTransaction } = {};
+
   async start(options: TransactionProcessorOptions) {
     if (this.isRunning) {
       throw new Error('Transaction processor is already running');
@@ -59,7 +62,24 @@ export class TransactionProcessor {
 
           reachedTip = false;
 
-          if (transactions.length > 0) {
+          transactions = this.handleCrossShardTransactions(shardId, transactions);
+
+          let validTransactions = [];
+          for (let transaction of transactions) {
+            // we only care about transactions that are finalized in the given shard
+            if (transaction.destinationShard !== shardId) {
+              continue;
+            }
+
+            // we skip transactions that are cross shard and still pending for smart-contract results
+            if (this.crossShardTransactionsDictionary[transaction.hash]) {
+              continue;
+            }
+
+            validTransactions.push(transaction);
+          }
+
+          if (validTransactions.length > 0) {
             let statistics = new TransactionStatistics();
 
             statistics.secondsElapsed = (new Date().getTime() - this.startDate.getTime()) / 1000;
@@ -68,7 +88,7 @@ export class TransactionProcessor {
             statistics.noncesLeft = currentNonce - lastProcessedNonce;
             statistics.secondsLeft = statistics.noncesLeft / statistics.noncesPerSecond * 1.1;
 
-            await this.onTransactionsReceived(shardId, nonce, transactions, statistics);
+            await this.onTransactionsReceived(shardId, nonce, validTransactions, statistics);
           }
 
           this.setLastProcessedNonce(shardId, nonce);
@@ -77,6 +97,53 @@ export class TransactionProcessor {
     } finally {
       this.isRunning = false;
     }
+  }
+
+  private handleCrossShardTransactions(shardId: number, transactions: ShardTransaction[]): ShardTransaction[] {
+    // pass 1: we add pending transactions in the dictionary from current shard to another one
+    for (let transaction of transactions) {
+      if (transaction.originalTransactionHash && transaction.sourceShard === shardId && transaction.destinationShard !== shardId) {
+        let counter = this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
+        if (!counter) {
+          let originalTransaction = transactions.find(x => x.hash === transaction.originalTransactionHash);
+          if (originalTransaction) {
+            this.crossShardTransactionsDictionary[transaction.originalTransactionHash] = originalTransaction;
+          }
+
+          counter = 0;
+        }
+
+        counter++;
+
+        this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash] = counter;
+      }
+    }
+
+    // pass 2: we delete pending transactions in the dictionary from another shard to current shard
+    for (let transaction of transactions) {
+      if (transaction.originalTransactionHash && transaction.sourceShard !== shardId && transaction.destinationShard === shardId) {
+        let counter = this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
+        if (!counter) {
+          continue;
+        }
+
+        counter--;
+
+        this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash] = counter;
+
+        if (counter === 0) {
+          let originalTransaction = this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
+          if (originalTransaction) {
+            transactions.push(originalTransaction);
+            delete this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
+          }
+
+          delete this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
+        }
+      }
+    }
+
+    return transactions;
   }
 
   private selectMany<TIN, TOUT>(array: TIN[], predicate: Function): TOUT[] {
@@ -112,12 +179,12 @@ export class TransactionProcessor {
         transaction.nonce = item.nonce;
         transaction.status = item.status;
         transaction.value = item.value;
+        transaction.originalTransactionHash = item.originalTransactionHash;
 
         return transaction;
       });
 
-    // we only care about transactions that are finalized on the destinationShard
-    return transactions.filter(x => x.destinationShard === shardId);
+    return transactions;
   }
 
   private async getShards(): Promise<number[]> {
@@ -219,6 +286,8 @@ export class ShardTransaction {
   sourceShard: number = 0;
   destinationShard: number = 0;
   nonce: number = 0;
+  previousTransactionHash: string | undefined;
+  originalTransactionHash: string | undefined;
 }
 
 export class TransactionStatistics {
