@@ -62,7 +62,7 @@ export class TransactionProcessor {
 
           reachedTip = false;
 
-          transactions = this.handleCrossShardTransactions(shardId, transactions);
+          let crossShardTransactions = this.handleCrossShardTransactions(shardId, transactions);
 
           let validTransactions = [];
           for (let transaction of transactions) {
@@ -79,6 +79,10 @@ export class TransactionProcessor {
             }
 
             validTransactions.push(transaction);
+          }
+
+          for (let crossShardTransaction of crossShardTransactions) {
+            validTransactions.push(crossShardTransaction);
           }
 
           if (validTransactions.length > 0) {
@@ -102,6 +106,8 @@ export class TransactionProcessor {
   }
 
   private handleCrossShardTransactions(shardId: number, transactions: ShardTransaction[]): ShardTransaction[] {
+    let crossShardTransactions: ShardTransaction[] = [];
+
     // pass 1: we add pending transactions in the dictionary from current shard to another one
     for (let transaction of transactions) {
       if (transaction.originalTransactionHash && transaction.sourceShard === shardId && transaction.destinationShard !== shardId) {
@@ -144,7 +150,7 @@ export class TransactionProcessor {
           let originalTransaction = this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
           if (originalTransaction) {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `Pushing transaction with hash ${transaction.originalTransactionHash}, contents: ${JSON.stringify(originalTransaction)}`);
-            transactions.push(originalTransaction);
+            crossShardTransactions.push(originalTransaction);
             delete this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
           } else {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `Could not identify transaction with hash ${transaction.originalTransactionHash} in cross shard transaction dictionary`);
@@ -155,7 +161,7 @@ export class TransactionProcessor {
       }
     }
 
-    return transactions;
+    return crossShardTransactions;
   }
 
   private selectMany<TIN, TOUT>(array: TIN[], predicate: Function): TOUT[] {
