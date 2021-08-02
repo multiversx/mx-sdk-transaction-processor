@@ -114,6 +114,7 @@ export class TransactionProcessor {
         }
 
         counter++;
+        this.logMessage(LogTopic.CrossShardSmartContractResult, `Detected new cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${counter}`);
 
         this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash] = counter;
       }
@@ -124,14 +125,17 @@ export class TransactionProcessor {
       if (transaction.originalTransactionHash && transaction.sourceShard !== shardId && transaction.destinationShard === shardId) {
         let counter = this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
         if (!counter) {
+          this.logMessage(LogTopic.CrossShardSmartContractResult, `No counter available for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}`);
           continue;
         }
 
         counter--;
+        this.logMessage(LogTopic.CrossShardSmartContractResult, `Finalized cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${counter}`);
 
         this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash] = counter;
 
         if (counter === 0) {
+          this.logMessage(LogTopic.CrossShardSmartContractResult, `Completed cross-shard transaction for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}`);
           let originalTransaction = this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
           if (originalTransaction) {
             transactions.push(originalTransaction);
@@ -274,6 +278,17 @@ export class TransactionProcessor {
       await onTransactionsReceivedFunc(shardId, nonce, transactions, statistics);
     }
   }
+
+  private logMessage(topic: LogTopic, message: string) {
+    let onMessageLogged = this.options.onMessageLogged;
+    if (onMessageLogged) {
+      onMessageLogged(topic, message);
+    }
+  }
+}
+
+export enum LogTopic {
+  CrossShardSmartContractResult = 'CrossShardSmartContractResult'
 }
 
 export class ShardTransaction {
@@ -304,4 +319,5 @@ export class TransactionProcessorOptions {
   onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics) => Promise<void>;
   getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
   setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
+  onMessageLogged?: (topic: LogTopic, message: string) => void;
 }
