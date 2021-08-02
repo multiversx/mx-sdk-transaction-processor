@@ -141,6 +141,7 @@ export class TransactionProcessor {
           this.logMessage(LogTopic.CrossShardSmartContractResult, `Completed cross-shard transaction for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}`);
           let originalTransaction = this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
           if (originalTransaction) {
+            this.logMessage(LogTopic.CrossShardSmartContractResult, `Pushing transaction: ${JSON.stringify(originalTransaction)}`);
             transactions.push(originalTransaction);
             delete this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
           } else {
