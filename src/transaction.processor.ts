@@ -68,11 +68,13 @@ export class TransactionProcessor {
           for (let transaction of transactions) {
             // we only care about transactions that are finalized in the given shard
             if (transaction.destinationShard !== shardId) {
+              this.logMessage(LogTopic.CrossShardSmartContractResult, `Transaction with hash ${transaction.hash} skipped since its destination shard (${transaction.destinationShard}) is different than current shard ${shardId}`);
               continue;
             }
 
             // we skip transactions that are cross shard and still pending for smart-contract results
             if (this.crossShardTransactionsDictionary[transaction.hash]) {
+              this.logMessage(LogTopic.CrossShardSmartContractResult, `Transaction with hash ${transaction.hash} skipped since it is present in the cross shard dictionary`);
               continue;
             }
 
@@ -141,7 +143,7 @@ export class TransactionProcessor {
           this.logMessage(LogTopic.CrossShardSmartContractResult, `Completed cross-shard transaction for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}`);
           let originalTransaction = this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
           if (originalTransaction) {
-            this.logMessage(LogTopic.CrossShardSmartContractResult, `Pushing transaction: ${JSON.stringify(originalTransaction)}`);
+            this.logMessage(LogTopic.CrossShardSmartContractResult, `Pushing transaction with hash ${transaction.originalTransactionHash}, contents: ${JSON.stringify(originalTransaction)}`);
             transactions.push(originalTransaction);
             delete this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
           } else {
