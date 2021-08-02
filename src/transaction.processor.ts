@@ -105,9 +105,12 @@ export class TransactionProcessor {
       if (transaction.originalTransactionHash && transaction.sourceShard === shardId && transaction.destinationShard !== shardId) {
         let counter = this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
         if (!counter) {
+          this.logMessage(LogTopic.CrossShardSmartContractResult, `Creating dictionary for original tx hash ${transaction.originalTransactionHash}`);
           let originalTransaction = transactions.find(x => x.hash === transaction.originalTransactionHash);
           if (originalTransaction) {
             this.crossShardTransactionsDictionary[transaction.originalTransactionHash] = originalTransaction;
+          } else {
+            this.logMessage(LogTopic.CrossShardSmartContractResult, `Could not identify transaction with hash ${transaction.originalTransactionHash} in transaction list`);
           }
 
           counter = 0;
@@ -140,6 +143,8 @@ export class TransactionProcessor {
           if (originalTransaction) {
             transactions.push(originalTransaction);
             delete this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
+          } else {
+            this.logMessage(LogTopic.CrossShardSmartContractResult, `Could not identify transaction with hash ${transaction.originalTransactionHash} in cross shard transaction dictionary`);
           }
 
           delete this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
