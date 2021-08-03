@@ -1,4 +1,8 @@
 import axios from "axios";
+import { LogTopic } from "./log.topic";
+import { ShardTransaction } from "./shard.transaction";
+import { TransactionProcessorOptions } from "./transaction.processor.options";
+import { TransactionStatistics } from "./transaction.statistics";
 
 export class TransactionProcessor {
   private startCurrentNonces: { [ key: number ]: number } = {};
@@ -301,37 +305,9 @@ export class TransactionProcessor {
   }
 }
 
-export enum LogTopic {
-  CrossShardSmartContractResult = 'CrossShardSmartContractResult'
-}
 
-export class ShardTransaction {
-  value: string = '';
-  data: string | undefined;
-  hash: string = '';
-  sender: string = '';
-  receiver: string = '';
-  status: string = '';
-  sourceShard: number = 0;
-  destinationShard: number = 0;
-  nonce: number = 0;
-  previousTransactionHash: string | undefined;
-  originalTransactionHash: string | undefined;
-}
 
-export class TransactionStatistics {
-  secondsElapsed: number = 0;
-  processedNonces: number = 0;
-  noncesPerSecond: number = 0;
-  noncesLeft: number = 0;
-  secondsLeft: number = 0;
-}
 
-export class TransactionProcessorOptions {
-  gatewayUrl?: string;
-  maxLookBehind?: number;
-  onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics) => Promise<void>;
-  getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
-  setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
-  onMessageLogged?: (topic: LogTopic, message: string) => void;
-}
+
+
+
