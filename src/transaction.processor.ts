@@ -66,8 +66,6 @@ export class TransactionProcessor {
 
           reachedTip = false;
 
-          let crossShardTransactions = this.handleCrossShardTransactions(shardId, transactions);
-
           let validTransactions = [];
           for (let transaction of transactions) {
             // we only care about transactions that are finalized in the given shard
@@ -85,8 +83,11 @@ export class TransactionProcessor {
             validTransactions.push(transaction);
           }
 
-          for (let crossShardTransaction of crossShardTransactions) {
-            validTransactions.push(crossShardTransaction);
+          if (this.options.waitForFinalizedCrossShardSmartContractResults === true) {
+            let crossShardTransactions = this.getFinalizedCrossShardScrTransactions(shardId, transactions);
+            for (let crossShardTransaction of crossShardTransactions) {
+              validTransactions.push(crossShardTransaction);
+            }
           }
 
           if (validTransactions.length > 0) {
@@ -109,7 +110,7 @@ export class TransactionProcessor {
     }
   }
 
-  private handleCrossShardTransactions(shardId: number, transactions: ShardTransaction[]): ShardTransaction[] {
+  private getFinalizedCrossShardScrTransactions(shardId: number, transactions: ShardTransaction[]): ShardTransaction[] {
     let crossShardTransactions: ShardTransaction[] = [];
 
     // pass 1: we add pending transactions in the dictionary from current shard to another one
