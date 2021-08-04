@@ -128,7 +128,7 @@ export class TransactionProcessor {
         // if '@ok', ignore
         if (transaction.data) {
           let data = this.base64Decode(transaction.data);
-          if (data.startsWith('@6f6b')) {
+          if (data === '@6f6b') {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `Not incrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
             continue;
           }
@@ -153,7 +153,7 @@ export class TransactionProcessor {
         // if '@ok', ignore
         if (transaction.data) {
           let data = this.base64Decode(transaction.data);
-          if (data.startsWith('@6f6b')) {
+          if (data === '@6f6b') {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `Not decrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
             continue;
           }
