@@ -125,14 +125,14 @@ export class TransactionProcessor {
           counter = 0;
         }
 
-        // if '@ok', ignore
-        if (transaction.data) {
-          let data = this.base64Decode(transaction.data);
-          if (data === '@6f6b') {
-            this.logMessage(LogTopic.CrossShardSmartContractResult, `Not incrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
-            continue;
-          }
-        }
+        // // if '@ok', ignore
+        // if (transaction.data) {
+        //   let data = this.base64Decode(transaction.data);
+        //   if (data === '@6f6b') {
+        //     this.logMessage(LogTopic.CrossShardSmartContractResult, `Not incrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
+        //     continue;
+        //   }
+        // }
 
         counter++;
         this.logMessage(LogTopic.CrossShardSmartContractResult, `Detected new cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${counter}`);
@@ -150,14 +150,14 @@ export class TransactionProcessor {
           continue;
         }
 
-        // if '@ok', ignore
-        if (transaction.data) {
-          let data = this.base64Decode(transaction.data);
-          if (data === '@6f6b') {
-            this.logMessage(LogTopic.CrossShardSmartContractResult, `Not decrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
-            continue;
-          }
-        }
+        // // if '@ok', ignore
+        // if (transaction.data) {
+        //   let data = this.base64Decode(transaction.data);
+        //   if (data === '@6f6b') {
+        //     this.logMessage(LogTopic.CrossShardSmartContractResult, `Not decrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
+        //     continue;
+        //   }
+        // }
 
         counter--;
         this.logMessage(LogTopic.CrossShardSmartContractResult, `Finalized cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${counter}`);
