@@ -63,6 +63,15 @@ export class TransactionProcessor {
           reachedTip = false;
 
           let validTransactions = [];
+
+          if (this.options.waitForFinalizedCrossShardSmartContractResults === true) {
+            let crossShardTransactions = this.getFinalizedCrossShardScrTransactions(shardId, transactions);
+
+            for (let crossShardTransaction of crossShardTransactions) {
+              validTransactions.push(crossShardTransaction);
+            }
+          }
+
           for (let transaction of transactions) {
             // we only care about transactions that are finalized in the given shard
             if (transaction.destinationShard !== shardId) {
@@ -77,13 +86,6 @@ export class TransactionProcessor {
             }
 
             validTransactions.push(transaction);
-          }
-
-          if (this.options.waitForFinalizedCrossShardSmartContractResults === true) {
-            let crossShardTransactions = this.getFinalizedCrossShardScrTransactions(shardId, transactions);
-            for (let crossShardTransaction of crossShardTransactions) {
-              validTransactions.push(crossShardTransaction);
-            }
           }
 
           if (validTransactions.length > 0) {
