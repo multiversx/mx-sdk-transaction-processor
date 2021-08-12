@@ -136,14 +136,14 @@ export class TransactionProcessor {
           }
         }
 
-        // // if '@ok', ignore
-        // if (transaction.data) {
-        //   let data = this.base64Decode(transaction.data);
-        //   if (data === '@6f6b') {
-        //     this.logMessage(LogTopic.CrossShardSmartContractResult, `Not incrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
-        //     continue;
-        //   }
-        // }
+        // if '@ok', ignore
+        if (transaction.data) {
+          let data = this.base64Decode(transaction.data);
+          if (data === '@6f6b') {
+            this.logMessage(LogTopic.CrossShardSmartContractResult, `Not incrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
+            continue;
+          }
+        }
 
         crossShardItem.counter++;
         this.logMessage(LogTopic.CrossShardSmartContractResult, `Detected new cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${crossShardItem.counter}`);
@@ -161,33 +161,34 @@ export class TransactionProcessor {
           continue;
         }
 
-        // // if '@ok', ignore
-        // if (transaction.data) {
-        //   let data = this.base64Decode(transaction.data);
-        //   if (data === '@6f6b') {
-        //     this.logMessage(LogTopic.CrossShardSmartContractResult, `Not decrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
-        //     continue;
-        //   }
-        // }
+        // if '@ok', ignore
+        if (transaction.data) {
+          let data = this.base64Decode(transaction.data);
+          if (data === '@6f6b') {
+            this.logMessage(LogTopic.CrossShardSmartContractResult, `Not decrementing counter for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash} since the data is @ok (${data})`);
+            continue;
+          }
+        }
 
         crossShardItem.counter--;
         this.logMessage(LogTopic.CrossShardSmartContractResult, `Finalized cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${crossShardItem.counter}`);
 
         this.crossShardDictionary[transaction.originalTransactionHash] = crossShardItem;
+      }
+    }
 
-        if (crossShardItem.counter === 0) {
-          this.logMessage(LogTopic.CrossShardSmartContractResult, `Completed cross-shard transaction for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}`);
-          let originalTransaction = this.crossShardDictionary[transaction.originalTransactionHash];
-          if (originalTransaction) {
-            this.logMessage(LogTopic.CrossShardSmartContractResult, `Pushing transaction with hash ${transaction.originalTransactionHash}`);
-            crossShardTransactions.push(originalTransaction.transaction);
-            delete this.crossShardDictionary[transaction.originalTransactionHash];
-          } else {
-            this.logMessage(LogTopic.CrossShardSmartContractResult, `Could not identify transaction with hash ${transaction.originalTransactionHash} in cross shard transaction dictionary`);
-          }
-
-          delete this.crossShardDictionary[transaction.originalTransactionHash];
+    // step 3. If the counter reached zero, we take the value out
+    let crossShardDictionaryHashes = Object.keys(this.crossShardDictionary);
+    for (let transactionHash of crossShardDictionaryHashes) {
+      let crossShardItem = this.crossShardDictionary[transactionHash];
+      if (crossShardItem.counter === 0) {
+        this.logMessage(LogTopic.CrossShardSmartContractResult, `Completed cross-shard transaction for original tx hash ${transactionHash}`);
+        // we only add it to the cross shard transactions if it isn't already in the list of completed transactions
+        if (!transactions.some(transaction => transaction.hash === transactionHash)) {
+          crossShardTransactions.push(crossShardItem.transaction);
         }
+
+        delete this.crossShardDictionary[transactionHash];
       }
     }
 
