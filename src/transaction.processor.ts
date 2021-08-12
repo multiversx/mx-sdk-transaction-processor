@@ -8,8 +8,7 @@ export class TransactionProcessor {
   private readonly lastProcessedNoncesInternal: { [key: number]: number } = {};
   private isRunning: boolean = false;
 
-  private crossShardTransactionsCounterDictionary: { [ key: string ]: number } = {};
-  private crossShardTransactionsDictionary: { [ key: string ]: ShardTransaction } = {};
+  private crossShardDictionary: { [ key: string ]: CrossShardTransaction } = {};
 
   async start(options: TransactionProcessorOptions) {
     if (this.isRunning) {
@@ -17,6 +16,16 @@ export class TransactionProcessor {
     }
 
     this.isRunning = true;
+
+    let crossShardHashes = Object.keys(this.crossShardDictionary);
+    for (let crossShardHash of crossShardHashes) {
+      let crossShardItem = this.crossShardDictionary[crossShardHash];
+      let elapsedSeconds = (new Date().getTime() - crossShardItem.created.getTime()) / 1000;
+      if (elapsedSeconds > 600) {
+        this.logMessage(LogTopic.CrossShardSmartContractResult, `Pruning transaction with hash ${crossShardHash} since its elapsed time is ${elapsedSeconds} seconds`);
+        delete this.crossShardDictionary[crossShardHash];
+      }
+    }
 
     try {
       this.options = options;
@@ -79,7 +88,7 @@ export class TransactionProcessor {
             }
 
             // we skip transactions that are cross shard and still pending for smart-contract results
-            if (this.crossShardTransactionsDictionary[transaction.hash]) {
+            if (this.crossShardDictionary[transaction.hash]) {
               continue;
             }
 
@@ -87,6 +96,8 @@ export class TransactionProcessor {
           }
 
           if (validTransactions.length > 0) {
+            this.logMessage(LogTopic.CrossShardSmartContractResult, `crossShardTransactionsCounterDictionary items: ${Object.keys(this.crossShardDictionary).length}`);
+
             let statistics = new TransactionStatistics();
 
             statistics.secondsElapsed = (new Date().getTime() - this.startDate.getTime()) / 1000;
@@ -112,17 +123,17 @@ export class TransactionProcessor {
     // pass 1: we add pending transactions in the dictionary from current shard to another one
     for (let transaction of transactions) {
       if (transaction.originalTransactionHash && transaction.sourceShard === shardId && transaction.destinationShard !== shardId) {
-        let counter = this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
-        if (!counter) {
+        let crossShardItem = this.crossShardDictionary[transaction.originalTransactionHash];
+        if (!crossShardItem) {
           this.logMessage(LogTopic.CrossShardSmartContractResult, `Creating dictionary for original tx hash ${transaction.originalTransactionHash}`);
           let originalTransaction = transactions.find(x => x.hash === transaction.originalTransactionHash);
           if (originalTransaction) {
-            this.crossShardTransactionsDictionary[transaction.originalTransactionHash] = originalTransaction;
+            crossShardItem = new CrossShardTransaction(originalTransaction);
+            this.crossShardDictionary[transaction.originalTransactionHash] = crossShardItem;
           } else {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `Could not identify transaction with hash ${transaction.originalTransactionHash} in transaction list`);
+            continue;
           }
-
-          counter = 0;
         }
 
         // // if '@ok', ignore
@@ -134,18 +145,18 @@ export class TransactionProcessor {
         //   }
         // }
 
-        counter++;
-        this.logMessage(LogTopic.CrossShardSmartContractResult, `Detected new cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${counter}`);
+        crossShardItem.counter++;
+        this.logMessage(LogTopic.CrossShardSmartContractResult, `Detected new cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${crossShardItem.counter}`);
 
-        this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash] = counter;
+        this.crossShardDictionary[transaction.originalTransactionHash] = crossShardItem;
       }
     }
 
     // pass 2: we delete pending transactions in the dictionary from another shard to current shard
     for (let transaction of transactions) {
       if (transaction.originalTransactionHash && transaction.sourceShard !== shardId && transaction.destinationShard === shardId) {
-        let counter = this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
-        if (!counter) {
+        let crossShardItem = this.crossShardDictionary[transaction.originalTransactionHash];
+        if (!crossShardItem) {
           this.logMessage(LogTopic.CrossShardSmartContractResult, `No counter available for cross-shard SCR, original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}`);
           continue;
         }
@@ -159,23 +170,23 @@ export class TransactionProcessor {
         //   }
         // }
 
-        counter--;
-        this.logMessage(LogTopic.CrossShardSmartContractResult, `Finalized cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${counter}`);
+        crossShardItem.counter--;
+        this.logMessage(LogTopic.CrossShardSmartContractResult, `Finalized cross-shard SCR for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}, counter = ${crossShardItem.counter}`);
 
-        this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash] = counter;
+        this.crossShardDictionary[transaction.originalTransactionHash] = crossShardItem;
 
-        if (counter === 0) {
+        if (crossShardItem.counter === 0) {
           this.logMessage(LogTopic.CrossShardSmartContractResult, `Completed cross-shard transaction for original tx hash ${transaction.originalTransactionHash}, tx hash ${transaction.hash}`);
-          let originalTransaction = this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
+          let originalTransaction = this.crossShardDictionary[transaction.originalTransactionHash];
           if (originalTransaction) {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `Pushing transaction with hash ${transaction.originalTransactionHash}`);
-            crossShardTransactions.push(originalTransaction);
-            delete this.crossShardTransactionsDictionary[transaction.originalTransactionHash];
+            crossShardTransactions.push(originalTransaction.transaction);
+            delete this.crossShardDictionary[transaction.originalTransactionHash];
           } else {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `Could not identify transaction with hash ${transaction.originalTransactionHash} in cross shard transaction dictionary`);
           }
 
-          delete this.crossShardTransactionsCounterDictionary[transaction.originalTransactionHash];
+          delete this.crossShardDictionary[transaction.originalTransactionHash];
         }
       }
     }
@@ -358,4 +369,14 @@ export class TransactionStatistics {
   noncesPerSecond: number = 0;
   noncesLeft: number = 0;
   secondsLeft: number = 0;
+}
+
+export class CrossShardTransaction { 
+  transaction: ShardTransaction;
+  counter: number = 0;
+  created: Date = new Date();
+
+  constructor(transaction: ShardTransaction) {
+    this.transaction = transaction;
+  }
 }
