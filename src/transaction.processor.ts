@@ -64,10 +64,13 @@ export class TransactionProcessor {
 
           let nonce = lastProcessedNonce + 1;
 
-          let transactions = await this.getShardTransactions(shardId, nonce);
-          if (transactions === undefined) {
+          let transactionsResult = await this.getShardTransactions(shardId, nonce);
+          if (transactionsResult === undefined) {
             continue;
           }
+
+          let blockHash = transactionsResult.blockHash;
+          let transactions = transactionsResult.transactions;
 
           reachedTip = false;
 
@@ -95,7 +98,7 @@ export class TransactionProcessor {
             validTransactions.push(transaction);
           }
 
-          if (validTransactions.length > 0) {
+          if (validTransactions.length > 0 || options.notifyEmptyBlocks === true) {
             this.logMessage(LogTopic.CrossShardSmartContractResult, `crossShardTransactionsCounterDictionary items: ${Object.keys(this.crossShardDictionary).length}`);
 
             let statistics = new TransactionStatistics();
@@ -106,7 +109,7 @@ export class TransactionProcessor {
             statistics.noncesLeft = currentNonce - lastProcessedNonce;
             statistics.secondsLeft = statistics.noncesLeft / statistics.noncesPerSecond * 1.1;
 
-            await this.onTransactionsReceived(shardId, nonce, validTransactions, statistics);
+            await this.onTransactionsReceived(shardId, nonce, validTransactions, statistics, blockHash);
           }
 
           this.setLastProcessedNonce(shardId, nonce);
@@ -209,7 +212,7 @@ export class TransactionProcessor {
     return result;
   };
 
-  private async getShardTransactions(shardId: number, nonce: number): Promise<ShardTransaction[] | undefined> {
+  private async getShardTransactions(shardId: number, nonce: number): Promise<{ blockHash: string, transactions: ShardTransaction[] } | undefined> {
     let result = await this.gatewayGet(`block/${shardId}/by-nonce/${nonce}?withTxs=true`);
 
     if (!result || !result.block) {
@@ -217,7 +220,7 @@ export class TransactionProcessor {
     }
 
     if (result.block.miniBlocks === undefined) {
-      return [];
+      return { blockHash: result.block.hash, transactions: [] };
     }
 
     let transactions: ShardTransaction[] = this.selectMany(result.block.miniBlocks, (x: any) => x.transactions)
@@ -233,11 +236,13 @@ export class TransactionProcessor {
         transaction.status = item.status;
         transaction.value = item.value;
         transaction.originalTransactionHash = item.originalTransactionHash;
+        transaction.gasPrice = item.gasPrice;
+        transaction.gasLimit = item.gasLimit;
 
         return transaction;
       });
 
-    return transactions;
+    return { blockHash: result.block.hash, transactions };
   }
 
   private async getShards(): Promise<number[]> {
@@ -321,10 +326,10 @@ export class TransactionProcessor {
     await setLastProcessedNonceFunc(shardId, nonce);
   }
   
-  private async onTransactionsReceived(shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics) {
+  private async onTransactionsReceived(shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics, blockHash: string) {
     let onTransactionsReceivedFunc = this.options.onTransactionsReceived;
     if (onTransactionsReceivedFunc) {
-      await onTransactionsReceivedFunc(shardId, nonce, transactions, statistics);
+      await onTransactionsReceivedFunc(shardId, nonce, transactions, statistics, blockHash);
     }
   }
 
@@ -342,7 +347,7 @@ export enum LogTopic {
 
 export class ShardTransaction {
   value: string = '';
-  data: string | undefined;
+  data?: string;
   hash: string = '';
   sender: string = '';
   receiver: string = '';
@@ -350,15 +355,53 @@ export class ShardTransaction {
   sourceShard: number = 0;
   destinationShard: number = 0;
   nonce: number = 0;
-  previousTransactionHash: string | undefined;
-  originalTransactionHash: string | undefined;
+  previousTransactionHash?: string;
+  originalTransactionHash?: string;
+  gasPrice?: number;
+  gasLimit?: number;
+
+  private dataDecoded: string | undefined;
+  private getDataDecoded(): string | undefined {
+    if (!this.dataDecoded) {
+      if (this.data) {
+        this.dataDecoded = base64Decode(this.data);
+      }
+    }
+
+    return this.dataDecoded;
+  }
+
+  private dataFunctionName: string | undefined;
+  public getDataFunctionName(): string | undefined {
+    if (!this.dataFunctionName) {
+      let decoded = this.getDataDecoded();
+      if (decoded) {
+        this.dataFunctionName = decoded.split('@')[0];
+      }
+    }
+
+    return this.dataFunctionName;
+  }
+
+  private dataArgs: string[] | undefined;
+  public getDataArgs(): string[] | undefined {
+    if (!this.dataArgs) {
+      let decoded = this.getDataDecoded();
+      if (decoded) {
+        this.dataArgs = decoded.split('@').splice(1);
+      }
+    }
+
+    return this.dataArgs;
+  }
 }
 
 export class TransactionProcessorOptions {
   gatewayUrl?: string;
   maxLookBehind?: number;
   waitForFinalizedCrossShardSmartContractResults?: boolean;
-  onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics) => Promise<void>;
+  notifyEmptyBlocks?: boolean;
+  onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics, blockHash: string) => Promise<void>;
   getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
   setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
   onMessageLogged?: (topic: LogTopic, message: string) => void;
@@ -380,4 +423,8 @@ export class CrossShardTransaction {
   constructor(transaction: ShardTransaction) {
     this.transaction = transaction;
   }
+}
+
+function base64Decode(str: string): string {
+  return Buffer.from(str, 'base64').toString('binary');
 }
