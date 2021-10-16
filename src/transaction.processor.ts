@@ -86,7 +86,7 @@ export class TransactionProcessor {
 
           for (let transaction of transactions) {
             // we only care about transactions that are finalized in the given shard
-            if (transaction.destinationShard !== shardId) {
+            if (transaction.destinationShard !== shardId && !options.includeCrossShardStartedTransactions) {
               continue;
             }
 
@@ -401,6 +401,7 @@ export class TransactionProcessorOptions {
   maxLookBehind?: number;
   waitForFinalizedCrossShardSmartContractResults?: boolean;
   notifyEmptyBlocks?: boolean;
+  includeCrossShardStartedTransactions?: boolean;
   onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics, blockHash: string) => Promise<void>;
   getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
   setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
