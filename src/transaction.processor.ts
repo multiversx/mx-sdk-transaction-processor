@@ -12,7 +12,8 @@ export class TransactionProcessor {
 
   async start(options: TransactionProcessorOptions) {
     if (this.isRunning) {
-      throw new Error('Transaction processor is already running');
+      this.logMessage(LogTopic.Debug, 'Transaction processor is already running');
+      return;
     }
 
     this.isRunning = true;
@@ -342,7 +343,8 @@ export class TransactionProcessor {
 }
 
 export enum LogTopic {
-  CrossShardSmartContractResult = 'CrossShardSmartContractResult'
+  CrossShardSmartContractResult = 'CrossShardSmartContractResult',
+  Debug = 'Debug',
 }
 
 export class ShardTransaction {
