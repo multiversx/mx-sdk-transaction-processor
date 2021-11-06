@@ -34,6 +34,9 @@ export class TransactionProcessor {
       this.shardIds = await this.getShards();
       this.startCurrentNonces = await this.getCurrentNonces();
 
+      this.logMessage(LogTopic.Debug, `shardIds: ${this.shardIds}`);
+      this.logMessage(LogTopic.Debug, `startCurrentNonces: ${this.startCurrentNonces}`);
+
       let startLastProcessedNonces: { [ key: number ]: number } = {};
 
       let reachedTip: boolean;
@@ -45,7 +48,10 @@ export class TransactionProcessor {
           let currentNonce = await this.estimateCurrentNonce(shardId);
           let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
 
+          this.logMessage(LogTopic.Debug, `shardId: ${shardId}, currentNonce: ${currentNonce}, lastProcessedNonce: ${lastProcessedNonce}`);
+
           if (lastProcessedNonce === currentNonce) {
+            this.logMessage(LogTopic.Debug, 'lastProcessedNonce === currentNonce');
             continue;
           }
 
@@ -67,6 +73,7 @@ export class TransactionProcessor {
 
           let transactionsResult = await this.getShardTransactions(shardId, nonce);
           if (transactionsResult === undefined) {
+            this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
             continue;
           }
 
@@ -88,11 +95,13 @@ export class TransactionProcessor {
           for (let transaction of transactions) {
             // we only care about transactions that are finalized in the given shard
             if (transaction.destinationShard !== shardId && !options.includeCrossShardStartedTransactions) {
+              this.logMessage(LogTopic.Debug, `transaction with hash '${transaction.hash}' not on destination shard. Skipping`);
               continue;
             }
 
             // we skip transactions that are cross shard and still pending for smart-contract results
             if (this.crossShardDictionary[transaction.hash]) {
+              this.logMessage(LogTopic.Debug, `transaction with hash '${transaction.hash}' is still awaiting cross shard SCRs. Skipping`);
               continue;
             }
 
@@ -109,10 +118,12 @@ export class TransactionProcessor {
             statistics.noncesPerSecond = statistics.processedNonces / statistics.secondsElapsed;
             statistics.noncesLeft = currentNonce - lastProcessedNonce;
             statistics.secondsLeft = statistics.noncesLeft / statistics.noncesPerSecond * 1.1;
+            this.logMessage(LogTopic.Debug, `For shardId ${shardId} and nonce ${nonce}, notifying transactions with hashes ${validTransactions.map(x => x.hash)}`);
 
             await this.onTransactionsReceived(shardId, nonce, validTransactions, statistics, blockHash);
           }
 
+          this.logMessage(LogTopic.Debug, `Setting last processed nonce for shardId ${shardId} to ${nonce}`);
           this.setLastProcessedNonce(shardId, nonce);
         }
       } while (reachedTip === false);
@@ -217,10 +228,12 @@ export class TransactionProcessor {
     let result = await this.gatewayGet(`block/${shardId}/by-nonce/${nonce}?withTxs=true`);
 
     if (!result || !result.block) {
+      this.logMessage(LogTopic.Debug, `Block for shardId ${shardId} and nonce ${nonce} is undefined or block not available`);
       return undefined;
     }
 
     if (result.block.miniBlocks === undefined) {
+      this.logMessage(LogTopic.Debug, `Block for shardId ${shardId} and nonce ${nonce} does not contain any miniBlocks`);
       return { blockHash: result.block.hash, transactions: [] };
     }
 
