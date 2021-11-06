@@ -35,7 +35,7 @@ export class TransactionProcessor {
       this.startCurrentNonces = await this.getCurrentNonces();
 
       this.logMessage(LogTopic.Debug, `shardIds: ${this.shardIds}`);
-      this.logMessage(LogTopic.Debug, `startCurrentNonces: ${this.startCurrentNonces}`);
+      this.logMessage(LogTopic.Debug, `startCurrentNonces: ${JSON.stringify(this.startCurrentNonces)}`);
 
       let startLastProcessedNonces: { [ key: number ]: number } = {};
 
