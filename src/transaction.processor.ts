@@ -1,12 +1,13 @@
 import axios from "axios";
 
 export class TransactionProcessor {
-  private startCurrentNonces: { [ key: number ]: number } = {};
   private startDate: Date = new Date();
   private shardIds: number[] = [];
   private options: TransactionProcessorOptions = new TransactionProcessorOptions();
   private readonly lastProcessedNoncesInternal: { [key: number]: number } = {};
   private isRunning: boolean = false;
+
+  private NETWORK_RESET_NONCE_THRESHOLD = 10000;
 
   private crossShardDictionary: { [ key: string ]: CrossShardTransaction } = {};
 
@@ -32,20 +33,20 @@ export class TransactionProcessor {
       this.options = options;
       this.startDate = new Date();
       this.shardIds = await this.getShards();
-      this.startCurrentNonces = await this.getCurrentNonces();
 
       this.logMessage(LogTopic.Debug, `shardIds: ${this.shardIds}`);
-      this.logMessage(LogTopic.Debug, `startCurrentNonces: ${JSON.stringify(this.startCurrentNonces)}`);
 
       let startLastProcessedNonces: { [ key: number ]: number } = {};
 
       let reachedTip: boolean;
 
+      let currentNonces = await this.getCurrentNonces();
+
       do {
         reachedTip = true;
 
         for (let shardId of this.shardIds) {
-          let currentNonce = await this.estimateCurrentNonce(shardId);
+          let currentNonce = currentNonces[shardId];
           let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
 
           this.logMessage(LogTopic.Debug, `shardId: ${shardId}, currentNonce: ${currentNonce}, lastProcessedNonce: ${lastProcessedNonce}`);
@@ -57,8 +58,14 @@ export class TransactionProcessor {
 
           // this is to handle the situation where the current nonce is reset
           // (e.g. devnet/testnet reset where the nonces start again from zero)
-          if (lastProcessedNonce > currentNonce) {
+          if (lastProcessedNonce > currentNonce + this.NETWORK_RESET_NONCE_THRESHOLD) {
+            this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce} for shard ${shardId}`);
             lastProcessedNonce = currentNonce;
+          }
+
+          if (lastProcessedNonce > currentNonce) {
+            this.logMessage(LogTopic.Debug, 'lastProcessedNonce > currentNonce');
+            continue;
           }
 
           if (options.maxLookBehind && currentNonce - lastProcessedNonce > options.maxLookBehind) {
@@ -300,15 +307,6 @@ export class TransactionProcessor {
     }
 
     return result;
-  }
-
-  private async estimateCurrentNonce(shardId: number): Promise<number> {
-    let startCurrentNonce = this.startCurrentNonces[shardId];
-
-    let secondsElapsedSinceStart = (new Date().getTime() - this.startDate.getTime()) / 1000;
-    let roundsElapsedSinceStart = Math.floor(secondsElapsedSinceStart / 6);
-
-    return startCurrentNonce + roundsElapsedSinceStart;
   }
 
   private async getLastProcessedNonceOrCurrent(shardId: number, currentNonce: number): Promise<number> {
