@@ -16,3 +16,5 @@ await transactionProcessor.start({
   }
 });
 ```
+
+[Here](example) is a full application ready to play with in.
