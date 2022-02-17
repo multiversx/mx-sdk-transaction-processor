@@ -14,16 +14,17 @@ export class TransactionProcessor {
 
   async start(options: TransactionProcessorOptions) {
     this.options = options;
-    switch (this.options.mode) {
-      case Mode.ProcessByHyperblockTransactions:
-        await this.startInProcessByHyperblockTransactionsMode(options);
+
+    switch (options.mode) {
+      case TransactionProcessorMode.Hyperblock:
+        await this.startProcessByHyperblock(options);
         break;
       default:
-        await this.startInProcessByShardsTransactionsMode(options);
+        await this.startProcessByShardblock(options);
     }
   }
 
-  async startInProcessByShardsTransactionsMode(options: TransactionProcessorOptions) {
+  async startProcessByShardblock(options: TransactionProcessorOptions) {
     if (this.isRunning) {
       this.logMessage(LogTopic.Debug, 'Transaction processor is already running');
       return;
@@ -150,7 +151,7 @@ export class TransactionProcessor {
     }
   }
 
-  async startInProcessByHyperblockTransactionsMode(options: TransactionProcessorOptions) {
+  async startProcessByHyperblock(options: TransactionProcessorOptions) {
     if (this.isRunning) {
       this.logMessage(LogTopic.Debug, 'Transaction processor is already running');
       return;
@@ -530,9 +531,9 @@ export class ShardTransaction {
   }
 }
 
-export enum Mode {
-  ProcessByShardsTransactions = 'ProcessByShardsTransactions',
-  ProcessByHyperblockTransactions = 'ProcessByHyperblockTransactions',
+export enum TransactionProcessorMode {
+  Shardblock = 'Shardblock',
+  Hyperblock = 'Hyperblock',
 }
 
 export class TransactionProcessorOptions {
@@ -541,7 +542,7 @@ export class TransactionProcessorOptions {
   waitForFinalizedCrossShardSmartContractResults?: boolean;
   notifyEmptyBlocks?: boolean;
   includeCrossShardStartedTransactions?: boolean;
-  mode?: Mode = Mode.ProcessByShardsTransactions;
+  mode?: TransactionProcessorMode;
   onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics, blockHash: string) => Promise<void>;
   getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
   setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
