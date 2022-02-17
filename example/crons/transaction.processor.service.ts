@@ -20,11 +20,11 @@ export class TransactionProcessorService {
         await this.transactionProcessor.start({
           mode: Mode.ProcessByHyperblockTransactions,
           gatewayUrl: 'https://gateway.elrond.com', // mainnet
-          getLastProcessedNonce: async (shardId: number | undefined, currentNonce: number) => {
+          getLastProcessedNonce: async (_shardId: number, _currentNonce: number) => {
             // In ProcessByHyperblockTransactions shardId will always be METACHAIN
             return this.lastNonce;
           },
-          setLastProcessedNonce: async(shardId: number | undefined, nonce: number) => {
+          setLastProcessedNonce: async(_shardId: number, nonce: number) => {
             // In ProcessByHyperblockTransactions shardId will always be METACHAIN
             this.lastNonce = nonce;
           },

@@ -550,8 +550,8 @@ export class TransactionProcessorOptions {
   includeCrossShardStartedTransactions?: boolean;
   mode?: Mode = Mode.ProcessByShardsTransactions;
   onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics, blockHash: string) => Promise<void>;
-  getLastProcessedNonce?: (shardId: number | undefined, currentNonce: number) => Promise<number | undefined>;
-  setLastProcessedNonce?: (shardId: number | undefined, nonce: number) => Promise<void>;
+  getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
+  setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
   onMessageLogged?: (topic: LogTopic, message: string) => void;
 }
 
