@@ -10,7 +10,7 @@ export class TransactionProcessor {
 
   private NETWORK_RESET_NONCE_THRESHOLD = 10000;
 
-  private crossShardDictionary: { [ key: string ]: CrossShardTransaction } = {};
+  private crossShardDictionary: { [key: string]: CrossShardTransaction } = {};
 
   async start(options: TransactionProcessorOptions) {
     this.options = options;
@@ -47,7 +47,7 @@ export class TransactionProcessor {
 
       this.logMessage(LogTopic.Debug, `shardIds: ${this.shardIds}`);
 
-      const startLastProcessedNonces: { [ key: number ]: number } = {};
+      const startLastProcessedNonces: { [key: number]: number } = {};
 
       let reachedTip: boolean;
 
@@ -209,7 +209,7 @@ export class TransactionProcessor {
           continue;
         }
 
-        const {blockHash, transactions} = transactionsResult;
+        const { blockHash, transactions } = transactionsResult;
 
         reachedTip = false;
 
@@ -350,10 +350,8 @@ export class TransactionProcessor {
       return { blockHash: result.block.hash, transactions: [] };
     }
 
-    const transactions: ShardTransaction[] = this.selectMany(result.block.miniBlocks, (x: any) => x.transactions)
-        .map((item: any) => {
-          return TransactionProcessor.itemToShardTransaction(item);
-        });
+    const transactions: ShardTransaction[] = this.selectMany(result.block.miniBlocks, (item: any) => item.transactions)
+      .map((item: any) => TransactionProcessor.itemToShardTransaction(item));
 
     return { blockHash: result.block.hash, transactions };
   }
@@ -363,12 +361,10 @@ export class TransactionProcessor {
     if (!result) {
       return undefined;
     }
-    const { hyperblock: {hash, transactions}} = result;
+    const { hyperblock: { hash, transactions } } = result;
 
     const shardTransactions: ShardTransaction[] = transactions
-        .map((item: any) => {
-          return TransactionProcessor.itemToShardTransaction(item);
-        });
+      .map((item: any) => TransactionProcessor.itemToShardTransaction(item));
 
     return { blockHash: hash, transactions: shardTransactions };
   }
@@ -387,7 +383,7 @@ export class TransactionProcessor {
     transaction.originalTransactionHash = item.originalTransactionHash;
     transaction.gasPrice = item.gasPrice;
     transaction.gasLimit = item.gasLimit;
-    return  transaction;
+    return transaction;
   }
 
   private async getShards(): Promise<number[]> {
@@ -420,12 +416,12 @@ export class TransactionProcessor {
     }
   }
 
-  private async getCurrentNonces(): Promise<{ [ key: number ]: number }> {
+  private async getCurrentNonces(): Promise<{ [key: number]: number }> {
     const currentNonces = await Promise.all(
-        this.shardIds.map(shardId => this.getCurrentNonce(shardId))
+      this.shardIds.map(shardId => this.getCurrentNonce(shardId))
     );
 
-    const result: { [ key: number ]: number } = {};
+    const result: { [key: number]: number } = {};
     for (const [index, shardId] of this.shardIds.entries()) {
       result[shardId] = currentNonces[index];
     }
@@ -535,7 +531,7 @@ export class ShardTransaction {
 }
 
 export enum Mode {
-  ProcessByShardsTransactions     = 'ProcessByShardsTransactions',
+  ProcessByShardsTransactions = 'ProcessByShardsTransactions',
   ProcessByHyperblockTransactions = 'ProcessByHyperblockTransactions',
 }
 
