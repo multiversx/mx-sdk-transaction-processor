@@ -15,14 +15,11 @@ export class TransactionProcessor {
   async start(options: TransactionProcessorOptions) {
     this.options = options;
     switch (this.options.mode) {
-      case Mode.ProcessByShardsTransactions:
-        await this.startInProcessByShardsTransactionsMode(options);
-        break;
       case Mode.ProcessByHyperblockTransactions:
         await this.startInProcessByHyperblockTransactionsMode(options);
         break;
       default:
-        this.logMessage(LogTopic.Error, "invalid mode");
+        await this.startInProcessByShardsTransactionsMode(options);
     }
   }
 
