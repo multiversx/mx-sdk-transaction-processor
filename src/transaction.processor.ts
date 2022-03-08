@@ -102,6 +102,7 @@ export class TransactionProcessor {
           reachedTip = false;
 
           const validTransactions = [];
+          const crossShardTransactions = [];
 
           if (this.options.waitForFinalizedCrossShardSmartContractResults === true) {
             const crossShardTransactions = this.getFinalizedCrossShardScrTransactions(shardId, transactions);
@@ -121,6 +122,7 @@ export class TransactionProcessor {
             // we skip transactions that are cross shard and still pending for smart-contract results
             if (this.crossShardDictionary[transaction.hash]) {
               this.logMessage(LogTopic.Debug, `transaction with hash '${transaction.hash}' is still awaiting cross shard SCRs. Skipping`);
+              crossShardTransactions.push(transaction);
               continue;
             }
 
@@ -140,6 +142,10 @@ export class TransactionProcessor {
             this.logMessage(LogTopic.Debug, `For shardId ${shardId} and nonce ${nonce}, notifying transactions with hashes ${validTransactions.map(x => x.hash)}`);
 
             await this.onTransactionsReceived(shardId, nonce, validTransactions, statistics, blockHash);
+          }
+
+          if (crossShardTransactions.length > 0) {
+            await this.onTransactionsPending(shardId, nonce, crossShardTransactions);
           }
 
           this.logMessage(LogTopic.Debug, `Setting last processed nonce for shardId ${shardId} to ${nonce}`);
@@ -466,6 +472,13 @@ export class TransactionProcessor {
     }
   }
 
+  private async onTransactionsPending(shardId: number, nonce: number, transactions: ShardTransaction[]) {
+    const onTransactionsPendingFunc = this.options.onTransactionsPending;
+    if (onTransactionsPendingFunc) {
+      await onTransactionsPendingFunc(shardId, nonce, transactions);
+    }
+  }
+
   private logMessage(topic: LogTopic, message: string) {
     const onMessageLogged = this.options.onMessageLogged;
     if (onMessageLogged) {
@@ -544,6 +557,7 @@ export class TransactionProcessorOptions {
   includeCrossShardStartedTransactions?: boolean;
   mode?: TransactionProcessorMode;
   onTransactionsReceived?: (shardId: number, nonce: number, transactions: ShardTransaction[], statistics: TransactionStatistics, blockHash: string) => Promise<void>;
+  onTransactionsPending?: (shardId: number, nonce: number, transactions: ShardTransaction[]) => Promise<void>;
   getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
   setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
   onMessageLogged?: (topic: LogTopic, message: string) => void;
