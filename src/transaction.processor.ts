@@ -175,7 +175,7 @@ export class TransactionProcessor {
       let reachedTip: boolean;
 
       const currentNonces = await this.getCurrentNonces();
-      const currentNonce = currentNonces[this.METACHAIN]
+      const currentNonce = currentNonces[this.METACHAIN];
 
       do {
         reachedTip = true;
