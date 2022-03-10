@@ -174,34 +174,34 @@ export class TransactionProcessor {
 
       let reachedTip: boolean;
 
-      const currentNonce = await this.getCurrentNonces();
+      const currentNonces = await this.getCurrentNonces();
+      const currentNonce = currentNonces[this.METACHAIN];
 
       do {
         reachedTip = true;
 
-        let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(this.METACHAIN, currentNonce[this.METACHAIN]);
+        let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(this.METACHAIN, currentNonce);
 
         this.logMessage(LogTopic.Debug, `currentNonce: ${currentNonce}, lastProcessedNonce: ${lastProcessedNonce}`);
 
-        if (lastProcessedNonce === currentNonce[this.METACHAIN]) {
-          this.logMessage(LogTopic.Debug, 'lastProcessedNonce === currentNonce');
+        if (lastProcessedNonce === currentNonce) {
           continue;
         }
 
         // this is to handle the situation where the current nonce is reset
         // (e.g. devnet/testnet reset where the nonces start again from zero)
-        if (lastProcessedNonce > currentNonce[this.METACHAIN] + this.NETWORK_RESET_NONCE_THRESHOLD) {
+        if (lastProcessedNonce > currentNonce + this.NETWORK_RESET_NONCE_THRESHOLD) {
           this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce}`);
-          lastProcessedNonce = currentNonce[this.METACHAIN];
+          lastProcessedNonce = currentNonce;
         }
 
-        if (lastProcessedNonce > currentNonce[this.METACHAIN]) {
+        if (lastProcessedNonce > currentNonce) {
           this.logMessage(LogTopic.Debug, 'lastProcessedNonce > currentNonce');
           continue;
         }
 
-        if (options.maxLookBehind && currentNonce[this.METACHAIN] - lastProcessedNonce > options.maxLookBehind) {
-          lastProcessedNonce = currentNonce[this.METACHAIN] - options.maxLookBehind;
+        if (options.maxLookBehind && currentNonce - lastProcessedNonce > options.maxLookBehind) {
+          lastProcessedNonce = currentNonce - options.maxLookBehind;
         }
 
         if (!startLastProcessedNonce) {
@@ -236,7 +236,7 @@ export class TransactionProcessor {
             statistics.secondsElapsed = (new Date().getTime() - this.startDate.getTime()) / 1000;
             statistics.processedNonces = lastProcessedNonce - startLastProcessedNonce;
             statistics.noncesPerSecond = statistics.processedNonces / statistics.secondsElapsed;
-            statistics.noncesLeft = currentNonce[this.METACHAIN] - lastProcessedNonce;
+            statistics.noncesLeft = currentNonce - lastProcessedNonce;
             statistics.secondsLeft = statistics.noncesLeft / statistics.noncesPerSecond * 1.1;
 
             this.logMessage(LogTopic.Debug, `For shardId ${shardId} and nonce ${nonce}, notifying transactions with hashes ${transactions.map(x => x.hash)}`);
