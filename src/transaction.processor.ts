@@ -369,7 +369,10 @@ export class TransactionProcessor {
       return undefined;
     }
     const { hyperblock: { hash, transactions } } = result;
-
+    if (transactions === undefined) {
+      return {blockHash: hash, transactions: []}
+    }
+    
     const shardTransactions: ShardTransaction[] = transactions
       .map((item: any) => TransactionProcessor.itemToShardTransaction(item));
 
