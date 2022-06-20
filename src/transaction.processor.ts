@@ -370,9 +370,9 @@ export class TransactionProcessor {
     }
     const { hyperblock: { hash, transactions } } = result;
     if (transactions === undefined) {
-      return {blockHash: hash, transactions: []}
+      return { blockHash: hash, transactions: [] }
     }
-    
+
     const shardTransactions: ShardTransaction[] = transactions
       .map((item: any) => TransactionProcessor.itemToShardTransaction(item));
 
@@ -422,7 +422,7 @@ export class TransactionProcessor {
       const result = await axios.get(fullUrl);
       return result.data.data;
     } catch (error) {
-      this.logMessage(LogTopic.Error, `Error when getting from gateway url ${fullUrl}: ${error}`);
+      throw new Error(`Error when getting from gateway url ${fullUrl}: ${error}`);
     }
   }
 
