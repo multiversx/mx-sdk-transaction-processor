@@ -357,7 +357,7 @@ export class TransactionProcessor {
       return { blockHash: result.block.hash, transactions: [] };
     }
 
-    const transactions: ShardTransaction[] = this.selectMany(result.block.miniBlocks, (item: any) => item.transactions)
+    const transactions: ShardTransaction[] = this.selectMany(result.block.miniBlocks, (item: any) => item.transactions ?? [])
       .map((item: any) => TransactionProcessor.itemToShardTransaction(item));
 
     return { blockHash: result.block.hash, transactions };
