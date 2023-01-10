@@ -1,4 +1,3 @@
-
 name: Publish transaction processor
 
 on:
@@ -16,16 +15,17 @@ jobs:
         with:
           node-version: 16
           registry-url: https://registry.npmjs.org/
-      
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RELEASE_TAG=v$(node -p "require('./package.json').version")
           gh release create $RELEASE_TAG --target=$GITHUB_SHA --title="$RELEASE_TAG" --generate-notes
-      
+
+      - run: npm run build
       - run: npm ci
-      
+
       - name: Publish to npmjs
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
