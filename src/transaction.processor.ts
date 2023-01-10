@@ -370,7 +370,7 @@ export class TransactionProcessor {
     }
     const { hyperblock: { hash, transactions } } = result;
     if (transactions === undefined) {
-      return { blockHash: hash, transactions: [] }
+      return { blockHash: hash, transactions: [] };
     }
 
     const shardTransactions: ShardTransaction[] = transactions
