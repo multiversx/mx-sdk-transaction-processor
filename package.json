@@ -1,6 +1,6 @@
 {
-  "name": "@elrondnetwork/transaction-processor",
-  "version": "0.1.26",
+  "name": "@multiversx/transaction-processor",
+  "version": "0.1.27",
   "description": "Real-time transaction processor",
   "main": "lib/transaction.processor.js",
   "types": "lib/transaction.processor.d.ts",
@@ -15,14 +15,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ElrondNetwork/transaction-processor.git"
+    "url": "git+https://github.com/multiversx/mx-sdk-transaction-processor"
   },
   "keywords": [
-    "elrond",
+    "multiversx",
     "transaction",
     "processor"
   ],
-  "author": "ElrondNetwork",
+  "author": "MultiversX",
   "license": "GPL-3.0-or-later",
   "devDependencies": {
     "@types/axios": "^0.14.0",

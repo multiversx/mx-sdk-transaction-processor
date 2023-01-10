@@ -4,7 +4,7 @@ Transaction processor for JavaScript and TypeScript (written in TypeScript).
 
 ## Distribution
 
-[npm](https://www.npmjs.com/package/@elrondnetwork/transaction-processor)
+[npm](https://www.npmjs.com/package/@multiversx/transaction-processor)
 
 ## Usage
 
@@ -13,7 +13,7 @@ let transactionProcessor = new TransactionProcessor();
 await transactionProcessor.start({
   onTransactionsReceived: (shardId, nonce, transactions) => {
     console.log(`Received ${transactions.length} transactions on shard ${shardId} and nonce ${nonce}`);
-  }
+  },
 });
 ```
 
