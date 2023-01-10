@@ -370,7 +370,7 @@ export class TransactionProcessor {
     }
     const { hyperblock: { hash, transactions } } = result;
     if (transactions === undefined) {
-      return { blockHash: hash, transactions: [] }
+      return { blockHash: hash, transactions: [] };
     }
 
     const shardTransactions: ShardTransaction[] = transactions
@@ -415,7 +415,7 @@ export class TransactionProcessor {
   }
 
   private async gatewayGet(path: string): Promise<any> {
-    const gatewayUrl = this.options.gatewayUrl ?? 'https://gateway.elrond.com';
+    const gatewayUrl = this.options.gatewayUrl ?? 'https://gateway.multiversx.com';
     const fullUrl = `${gatewayUrl}/${path}`;
 
     try {

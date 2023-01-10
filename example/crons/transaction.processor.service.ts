@@ -15,11 +15,11 @@ export class TransactionProcessorService {
   }
 
   @Cron('*/1 * * * * *')
-  async handleNewElrondTransactions() {
-    Locker.lock('newElrondTransactions', async () => {
+  async handleNewMultiversxTransactions() {
+    Locker.lock('newMultiversxTransactions', async () => {
         await this.transactionProcessor.start({
           mode: Mode.ProcessByHyperblockTransactions,
-          gatewayUrl: 'https://gateway.elrond.com', // mainnet
+          gatewayUrl: 'https://gateway.multiversx.com', // mainnet
           getLastProcessedNonce: async (_shardId: number, _currentNonce: number) => {
             // In ProcessByHyperblockTransactions shardId will always be METACHAIN
             return this.lastNonce;
