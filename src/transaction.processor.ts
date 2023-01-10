@@ -415,7 +415,7 @@ export class TransactionProcessor {
   }
 
   private async gatewayGet(path: string): Promise<any> {
-    const gatewayUrl = this.options.gatewayUrl ?? 'https://gateway.elrond.com';
+    const gatewayUrl = this.options.gatewayUrl ?? 'https://gateway.multiversx.com';
     const fullUrl = `${gatewayUrl}/${path}`;
 
     try {
