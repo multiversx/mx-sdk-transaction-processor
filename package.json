@@ -1,6 +1,6 @@
 {
-  "name": "@multiversx/transaction-processor",
-  "version": "0.1.28",
+  "name": "@multiversx/sdk-transaction-processor",
+  "version": "0.1.29",
   "description": "Real-time transaction processor",
   "main": "lib/transaction.processor.js",
   "types": "lib/transaction.processor.d.ts",
@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/multiversx/mx-sdk-transaction-processor"
+    "url": "git+https://github.com/multiversx/mx-sdk-transaction-processor.git"
   },
   "keywords": [
     "multiversx",
