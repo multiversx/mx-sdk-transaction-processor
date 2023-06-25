@@ -419,7 +419,9 @@ export class TransactionProcessor {
     const fullUrl = `${gatewayUrl}/${path}`;
 
     try {
-      const result = await axios.get(fullUrl);
+      const result = await axios.get(fullUrl, {
+        timeout: 5000,
+      });
       return result.data.data;
     } catch (error) {
       throw new Error(`Error when getting from gateway url ${fullUrl}: ${error}`);
