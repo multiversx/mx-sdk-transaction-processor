@@ -420,7 +420,7 @@ export class TransactionProcessor {
 
     try {
       const result = await axios.get(fullUrl, {
-        timeout: 5000,
+        timeout: this.options.timeout ?? 5000,
       });
       return result.data.data;
     } catch (error) {
@@ -566,6 +566,7 @@ export class TransactionProcessorOptions {
   getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
   setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
   onMessageLogged?: (topic: LogTopic, message: string) => void;
+  timeout?: number | undefined;
 }
 
 export class TransactionStatistics {
