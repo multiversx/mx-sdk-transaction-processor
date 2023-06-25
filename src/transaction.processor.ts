@@ -419,7 +419,9 @@ export class TransactionProcessor {
     const fullUrl = `${gatewayUrl}/${path}`;
 
     try {
-      const result = await axios.get(fullUrl);
+      const result = await axios.get(fullUrl, {
+        timeout: this.options.timeout ?? 5000,
+      });
       return result.data.data;
     } catch (error) {
       throw new Error(`Error when getting from gateway url ${fullUrl}: ${error}`);
@@ -564,6 +566,7 @@ export class TransactionProcessorOptions {
   getLastProcessedNonce?: (shardId: number, currentNonce: number) => Promise<number | undefined>;
   setLastProcessedNonce?: (shardId: number, nonce: number) => Promise<void>;
   onMessageLogged?: (topic: LogTopic, message: string) => void;
+  timeout?: number | undefined;
 }
 
 export class TransactionStatistics {
