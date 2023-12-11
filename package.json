@@ -1,6 +1,6 @@
 {
   "name": "@multiversx/sdk-transaction-processor",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "description": "Real-time transaction processor",
   "main": "lib/transaction.processor.js",
   "types": "lib/transaction.processor.d.ts",
@@ -25,13 +25,12 @@
   "author": "MultiversX",
   "license": "GPL-3.0-or-later",
   "devDependencies": {
-    "@types/axios": "^0.14.0",
     "@types/node": "^16.11.10",
     "@typescript-eslint/eslint-plugin": "^5.12.0",
     "eslint": "^8.9.0",
     "typescript": "^4.3.5"
   },
   "dependencies": {
-    "axios": "^0.21.1"
+    "axios": "^1.6.1"
   }
 }
