@@ -393,6 +393,7 @@ export class TransactionProcessor {
     transaction.originalTransactionHash = item.originalTransactionHash;
     transaction.gasPrice = item.gasPrice;
     transaction.gasLimit = item.gasLimit;
+    transaction.epoch = item.epoch;
     return transaction;
   }
 
@@ -512,6 +513,7 @@ export class ShardTransaction {
   originalTransactionHash?: string;
   gasPrice?: number;
   gasLimit?: number;
+  epoch: number = 0;
 
   private dataDecoded: string | undefined;
   private getDataDecoded(): string | undefined {
