@@ -1,6 +1,6 @@
 {
   "name": "@multiversx/sdk-transaction-processor",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "description": "Real-time transaction processor",
   "main": "lib/transaction.processor.js",
   "types": "lib/transaction.processor.d.ts",
