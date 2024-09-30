@@ -22,6 +22,11 @@ export class TransactionProcessor {
   private isRunning: boolean = false;
   private crossShardDictionary: { [key: string]: CrossShardTransaction } = {};
   private httpService: HttpService | undefined;
+  private readonly shardsMaintainerService: ShardsMaintainerService;
+
+  constructor() {
+    this.shardsMaintainerService = new ShardsMaintainerService();
+  }
 
   async start(options: TransactionProcessorOptions): Promise<void> {
     this.options = options;
@@ -385,7 +390,7 @@ export class TransactionProcessor {
   }
 
   private async getShards(): Promise<number[]> {
-    return new ShardsMaintainerService().get(this.options.gatewayUrl, this.options.timeout);
+    return this.shardsMaintainerService.get(this.options.gatewayUrl, this.options.timeout);
   }
 
   private async getCurrentNonce(shardId: number): Promise<number> {
