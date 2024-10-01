@@ -22,11 +22,7 @@ export class TransactionProcessor {
   private isRunning: boolean = false;
   private crossShardDictionary: { [key: string]: CrossShardTransaction } = {};
   private httpService: HttpService | undefined;
-  private readonly shardsMaintainerService: ShardsMaintainerService;
-
-  constructor() {
-    this.shardsMaintainerService = new ShardsMaintainerService();
-  }
+  private readonly shardsMaintainerService: ShardsMaintainerService = new ShardsMaintainerService();
 
   async start(options: TransactionProcessorOptions): Promise<void> {
     this.options = options;

@@ -2,17 +2,17 @@ import { METACHAIN } from "./utils/constants";
 import { HttpService } from "./utils/http.service";
 
 export class ShardsMaintainerService {
-  private static shardIds: number[] | undefined = undefined;
+  private shardIds: number[] | undefined = undefined;
 
   async get(
     baseUrl: string | undefined,
     timeout: number | undefined,
   ) {
-    if (ShardsMaintainerService.shardIds != null) {
-      return ShardsMaintainerService.shardIds;
+    if (this.shardIds != null) {
+      return this.shardIds;
     }
 
-    return ShardsMaintainerService.shardIds = await this.getShards(baseUrl, timeout);
+    return this.shardIds = await this.getShards(baseUrl, timeout);
   }
 
   private async getShards(
