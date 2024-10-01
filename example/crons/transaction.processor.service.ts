@@ -18,7 +18,7 @@ export class TransactionProcessorService {
   async handleNewMultiversxTransactions() {
     Locker.lock('newMultiversxTransactions', async () => {
       await this.transactionProcessor.start({
-        mode: TransactionProcessorMode.Hyperblock,
+        mode: TransactionProcessorMode.Shardblock,
         gatewayUrl: 'https://gateway.multiversx.com', // mainnet
         getLastProcessedNonce: async (_shardId: number, _currentNonce: number) => {
           // In ProcessByHyperblockTransactions shardId will always be METACHAIN
