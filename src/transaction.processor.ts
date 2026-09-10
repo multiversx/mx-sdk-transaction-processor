@@ -75,7 +75,7 @@ export class TransactionProcessor {
         );
 
         for (const shardBlock of shardBlocks) {
-          if (shardBlock === undefined) {
+          if (shardBlock == null) {
             continue;
           }
 
@@ -85,8 +85,8 @@ export class TransactionProcessor {
             startLastProcessedNonces[shardId] = lastProcessedNonce;
           }
 
-          if (transactionsResult === undefined) {
-            this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
+          if (transactionsResult == null) {
+            this.logMessage(LogTopic.Debug, 'transactionsResult is null');
             continue;
           }
 
@@ -205,8 +205,8 @@ export class TransactionProcessor {
         const nonce = lastProcessedNonce + 1;
 
         const transactionsResult = await this.getHyperblockTransactions(nonce);
-        if (transactionsResult === undefined) {
-          this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
+        if (transactionsResult == null) {
+          this.logMessage(LogTopic.Debug, 'transactionsResult is null');
           continue;
         }
 
