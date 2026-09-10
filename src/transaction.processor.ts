@@ -70,42 +70,32 @@ export class TransactionProcessor {
       do {
         reachedTip = true;
 
-        for (const shardId of this.shardIds) {
-          const currentNonce = currentNonces[shardId];
-          let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
+        const shardBlockResults = await Promise.allSettled(
+          this.shardIds.map(shardId => this.fetchNextShardBlock(shardId, currentNonces[shardId], options)),
+        );
 
-          this.logMessage(LogTopic.Debug, `shardId: ${shardId}, currentNonce: ${currentNonce}, lastProcessedNonce: ${lastProcessedNonce}`);
-
-          if (lastProcessedNonce === currentNonce) {
-            this.logMessage(LogTopic.Debug, 'lastProcessedNonce === currentNonce');
+        for (const [index, result] of shardBlockResults.entries()) {
+          if (result.status === 'rejected') {
+            const shardId = this.shardIds[index];
+            const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+            this.logMessage(LogTopic.Error, `Failed to fetch next shard block for shardId ${shardId}: ${reason}`);
+            reachedTip = false;
             continue;
           }
 
-          // this is to handle the situation where the current nonce is reset
-          // (e.g. devnet/testnet reset where the nonces start again from zero)
-          if (lastProcessedNonce > currentNonce + NETWORK_RESET_NONCE_THRESHOLD) {
-            this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce} for shard ${shardId}`);
-            lastProcessedNonce = currentNonce;
-          }
-
-          if (lastProcessedNonce > currentNonce) {
-            this.logMessage(LogTopic.Debug, 'lastProcessedNonce > currentNonce');
+          const shardBlock = result.value;
+          if (shardBlock == null) {
             continue;
           }
 
-          if (options.maxLookBehind && currentNonce - lastProcessedNonce > options.maxLookBehind) {
-            lastProcessedNonce = currentNonce - options.maxLookBehind;
-          }
+          const { shardId, currentNonce, lastProcessedNonce, nonce, transactionsResult } = shardBlock;
 
           if (!startLastProcessedNonces[shardId]) {
             startLastProcessedNonces[shardId] = lastProcessedNonce;
           }
 
-          const nonce = lastProcessedNonce + 1;
-
-          const transactionsResult = await this.getShardTransactions(shardId, nonce);
-          if (transactionsResult === undefined) {
-            this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
+          if (transactionsResult == null) {
+            this.logMessage(LogTopic.Debug, 'transactionsResult is null');
             continue;
           }
 
@@ -224,8 +214,8 @@ export class TransactionProcessor {
         const nonce = lastProcessedNonce + 1;
 
         const transactionsResult = await this.getHyperblockTransactions(nonce);
-        if (transactionsResult === undefined) {
-          this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
+        if (transactionsResult == null) {
+          this.logMessage(LogTopic.Debug, 'transactionsResult is null');
           continue;
         }
 
@@ -341,6 +331,48 @@ export class TransactionProcessor {
     }
 
     return crossShardTransactions;
+  }
+
+  private async fetchNextShardBlock(
+    shardId: number,
+    currentNonce: number,
+    options: TransactionProcessorOptions,
+  ): Promise<{
+    shardId: number;
+    currentNonce: number;
+    lastProcessedNonce: number;
+    nonce: number;
+    transactionsResult: { blockHash: string, transactions: ShardTransaction[] } | undefined;
+  } | undefined> {
+    let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
+
+    this.logMessage(LogTopic.Debug, `shardId: ${shardId}, currentNonce: ${currentNonce}, lastProcessedNonce: ${lastProcessedNonce}`);
+
+    if (lastProcessedNonce === currentNonce) {
+      this.logMessage(LogTopic.Debug, 'lastProcessedNonce === currentNonce');
+      return undefined;
+    }
+
+    // this is to handle the situation where the current nonce is reset
+    // (e.g. devnet/testnet reset where the nonces start again from zero)
+    if (lastProcessedNonce > currentNonce + NETWORK_RESET_NONCE_THRESHOLD) {
+      this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce} for shard ${shardId}`);
+      lastProcessedNonce = currentNonce;
+    }
+
+    if (lastProcessedNonce > currentNonce) {
+      this.logMessage(LogTopic.Debug, 'lastProcessedNonce > currentNonce');
+      return undefined;
+    }
+
+    if (options.maxLookBehind && currentNonce - lastProcessedNonce > options.maxLookBehind) {
+      lastProcessedNonce = currentNonce - options.maxLookBehind;
+    }
+
+    const nonce = lastProcessedNonce + 1;
+    const transactionsResult = await this.getShardTransactions(shardId, nonce);
+
+    return { shardId, currentNonce, lastProcessedNonce, nonce, transactionsResult };
   }
 
   private async getShardTransactions(shardId: number, nonce: number): Promise<{ blockHash: string, transactions: ShardTransaction[] } | undefined> {
