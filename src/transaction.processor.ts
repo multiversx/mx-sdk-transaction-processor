@@ -70,40 +70,21 @@ export class TransactionProcessor {
       do {
         reachedTip = true;
 
-        for (const shardId of this.shardIds) {
-          const currentNonce = currentNonces[shardId];
-          let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
+        const shardBlocks = await Promise.all(
+          this.shardIds.map(shardId => this.fetchNextShardBlock(shardId, currentNonces[shardId], options)),
+        );
 
-          this.logMessage(LogTopic.Debug, `shardId: ${shardId}, currentNonce: ${currentNonce}, lastProcessedNonce: ${lastProcessedNonce}`);
-
-          if (lastProcessedNonce === currentNonce) {
-            this.logMessage(LogTopic.Debug, 'lastProcessedNonce === currentNonce');
+        for (const shardBlock of shardBlocks) {
+          if (shardBlock === undefined) {
             continue;
           }
 
-          // this is to handle the situation where the current nonce is reset
-          // (e.g. devnet/testnet reset where the nonces start again from zero)
-          if (lastProcessedNonce > currentNonce + NETWORK_RESET_NONCE_THRESHOLD) {
-            this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce} for shard ${shardId}`);
-            lastProcessedNonce = currentNonce;
-          }
-
-          if (lastProcessedNonce > currentNonce) {
-            this.logMessage(LogTopic.Debug, 'lastProcessedNonce > currentNonce');
-            continue;
-          }
-
-          if (options.maxLookBehind && currentNonce - lastProcessedNonce > options.maxLookBehind) {
-            lastProcessedNonce = currentNonce - options.maxLookBehind;
-          }
+          const { shardId, currentNonce, lastProcessedNonce, nonce, transactionsResult } = shardBlock;
 
           if (!startLastProcessedNonces[shardId]) {
             startLastProcessedNonces[shardId] = lastProcessedNonce;
           }
 
-          const nonce = lastProcessedNonce + 1;
-
-          const transactionsResult = await this.getShardTransactions(shardId, nonce);
           if (transactionsResult === undefined) {
             this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
             continue;
@@ -341,6 +322,48 @@ export class TransactionProcessor {
     }
 
     return crossShardTransactions;
+  }
+
+  private async fetchNextShardBlock(
+    shardId: number,
+    currentNonce: number,
+    options: TransactionProcessorOptions,
+  ): Promise<{
+    shardId: number;
+    currentNonce: number;
+    lastProcessedNonce: number;
+    nonce: number;
+    transactionsResult: { blockHash: string, transactions: ShardTransaction[] } | undefined;
+  } | undefined> {
+    let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
+
+    this.logMessage(LogTopic.Debug, `shardId: ${shardId}, currentNonce: ${currentNonce}, lastProcessedNonce: ${lastProcessedNonce}`);
+
+    if (lastProcessedNonce === currentNonce) {
+      this.logMessage(LogTopic.Debug, 'lastProcessedNonce === currentNonce');
+      return undefined;
+    }
+
+    // this is to handle the situation where the current nonce is reset
+    // (e.g. devnet/testnet reset where the nonces start again from zero)
+    if (lastProcessedNonce > currentNonce + NETWORK_RESET_NONCE_THRESHOLD) {
+      this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce} for shard ${shardId}`);
+      lastProcessedNonce = currentNonce;
+    }
+
+    if (lastProcessedNonce > currentNonce) {
+      this.logMessage(LogTopic.Debug, 'lastProcessedNonce > currentNonce');
+      return undefined;
+    }
+
+    if (options.maxLookBehind && currentNonce - lastProcessedNonce > options.maxLookBehind) {
+      lastProcessedNonce = currentNonce - options.maxLookBehind;
+    }
+
+    const nonce = lastProcessedNonce + 1;
+    const transactionsResult = await this.getShardTransactions(shardId, nonce);
+
+    return { shardId, currentNonce, lastProcessedNonce, nonce, transactionsResult };
   }
 
   private async getShardTransactions(shardId: number, nonce: number): Promise<{ blockHash: string, transactions: ShardTransaction[] } | undefined> {
