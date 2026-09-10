@@ -70,11 +70,20 @@ export class TransactionProcessor {
       do {
         reachedTip = true;
 
-        const shardBlocks = await Promise.all(
+        const shardBlockResults = await Promise.allSettled(
           this.shardIds.map(shardId => this.fetchNextShardBlock(shardId, currentNonces[shardId], options)),
         );
 
-        for (const shardBlock of shardBlocks) {
+        for (const [index, result] of shardBlockResults.entries()) {
+          if (result.status === 'rejected') {
+            const shardId = this.shardIds[index];
+            const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+            this.logMessage(LogTopic.Error, `Failed to fetch next shard block for shardId ${shardId}: ${reason}`);
+            reachedTip = false;
+            continue;
+          }
+
+          const shardBlock = result.value;
           if (shardBlock == null) {
             continue;
           }
