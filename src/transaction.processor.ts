@@ -1,6 +1,6 @@
 import { GatewayBlockResponse } from './types/gateway/block-response';
 import { GatewayMiniblockProcessingType } from './types/gateway/miniblock-processing-type.enum';
-import { METACHAIN, NETWORK_RESET_NONCE_THRESHOLD } from './utils/constants';
+import { DEFAULT_MAX_PREFETCH, METACHAIN, NETWORK_RESET_NONCE_THRESHOLD } from './utils/constants';
 import { TransactionProcessorMode } from './types/transaction-processor-mode.enum';
 import { LogTopic } from './types/log-topic';
 import { TransactionStatistics } from './types/transaction-statistics';
@@ -13,6 +13,9 @@ import { GatewayMiniblock } from './types/gateway/miniblock';
 import { GatewayTransaction } from './types/gateway/transaction';
 import { ShardsMaintainerService } from './shards-maintainer.service';
 import { HttpService } from './utils/http.service';
+import { BlockPrefetcher } from './utils/block-prefetcher';
+
+type BlockTransactions = { blockHash: string, transactions: ShardTransaction[] };
 
 export class TransactionProcessor {
   private startDate: Date = new Date();
@@ -23,6 +26,18 @@ export class TransactionProcessor {
   private crossShardDictionary: { [key: string]: CrossShardTransaction } = {};
   private httpService: HttpService | undefined;
   private readonly shardsMaintainerService: ShardsMaintainerService = new ShardsMaintainerService();
+
+  // Kept on the instance rather than per pass: start() is typically re-entered by a sub-second
+  // cron, so blocks read ahead near the end of one pass are still warm at the start of the next.
+  private readonly shardBlockPrefetcher = new BlockPrefetcher<BlockTransactions>(
+    (shardId, nonce) => this.getShardTransactions(shardId, nonce),
+    (shardId, nonce, error) => this.logMessage(LogTopic.Debug, `Could not read block for shardId ${shardId} and nonce ${nonce}: ${error}`),
+  );
+
+  private readonly hyperblockPrefetcher = new BlockPrefetcher<BlockTransactions>(
+    (_shardId, nonce) => this.getHyperblockTransactions(nonce),
+    (_shardId, nonce, error) => this.logMessage(LogTopic.Debug, `Could not read hyperblock for nonce ${nonce}: ${error}`),
+  );
 
   async start(options: TransactionProcessorOptions): Promise<void> {
     this.options = options;
@@ -94,8 +109,8 @@ export class TransactionProcessor {
             startLastProcessedNonces[shardId] = lastProcessedNonce;
           }
 
-          if (transactionsResult == null) {
-            this.logMessage(LogTopic.Debug, 'transactionsResult is null');
+          if (transactionsResult === undefined) {
+            this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
             continue;
           }
 
@@ -196,6 +211,7 @@ export class TransactionProcessor {
         if (lastProcessedNonce > currentNonce + NETWORK_RESET_NONCE_THRESHOLD) {
           this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce}`);
           lastProcessedNonce = currentNonce;
+          this.hyperblockPrefetcher.clearShard(METACHAIN);
         }
 
         if (lastProcessedNonce > currentNonce) {
@@ -213,9 +229,12 @@ export class TransactionProcessor {
 
         const nonce = lastProcessedNonce + 1;
 
-        const transactionsResult = await this.getHyperblockTransactions(nonce);
-        if (transactionsResult == null) {
-          this.logMessage(LogTopic.Debug, 'transactionsResult is null');
+        this.hyperblockPrefetcher.prune(METACHAIN, nonce);
+        this.hyperblockPrefetcher.prime(METACHAIN, nonce, nonce + this.getPrefetchSize(currentNonce - lastProcessedNonce) - 1);
+
+        const transactionsResult = await this.hyperblockPrefetcher.take(METACHAIN, nonce);
+        if (transactionsResult === undefined) {
+          this.logMessage(LogTopic.Debug, 'transactionsResult === undefined');
           continue;
         }
 
@@ -333,6 +352,17 @@ export class TransactionProcessor {
     return crossShardTransactions;
   }
 
+  /**
+   * Size of the read-ahead window for a shard that is `noncesBehind` blocks behind the tip.
+   * Never exceeds the distance to the tip: at the tip there is nothing to speculate on, and
+   * reading past it would only ask the gateway for blocks that do not exist yet.
+   */
+  private getPrefetchSize(noncesBehind: number): number {
+    const maxPrefetch = this.options.maxPrefetch ?? DEFAULT_MAX_PREFETCH;
+
+    return Math.max(1, Math.min(maxPrefetch, noncesBehind));
+  }
+
   private async fetchNextShardBlock(
     shardId: number,
     currentNonce: number,
@@ -342,7 +372,7 @@ export class TransactionProcessor {
     currentNonce: number;
     lastProcessedNonce: number;
     nonce: number;
-    transactionsResult: { blockHash: string, transactions: ShardTransaction[] } | undefined;
+    transactionsResult: BlockTransactions | undefined;
   } | undefined> {
     let lastProcessedNonce = await this.getLastProcessedNonceOrCurrent(shardId, currentNonce);
 
@@ -358,6 +388,8 @@ export class TransactionProcessor {
     if (lastProcessedNonce > currentNonce + NETWORK_RESET_NONCE_THRESHOLD) {
       this.logMessage(LogTopic.Debug, `Detected network reset. Setting last processed nonce to ${currentNonce} for shard ${shardId}`);
       lastProcessedNonce = currentNonce;
+      // Everything read ahead belongs to the pre-reset chain and can never be delivered.
+      this.shardBlockPrefetcher.clearShard(shardId);
     }
 
     if (lastProcessedNonce > currentNonce) {
@@ -370,12 +402,19 @@ export class TransactionProcessor {
     }
 
     const nonce = lastProcessedNonce + 1;
-    const transactionsResult = await this.getShardTransactions(shardId, nonce);
+
+    // Top the read-ahead window up before waiting on this nonce, so that while this block is
+    // being handed to the consumer the reads for the following nonces are already in flight.
+    // Only nonces up to the tip observed at the start of the pass are ever requested.
+    this.shardBlockPrefetcher.prune(shardId, nonce);
+    this.shardBlockPrefetcher.prime(shardId, nonce, nonce + this.getPrefetchSize(currentNonce - lastProcessedNonce) - 1);
+
+    const transactionsResult = await this.shardBlockPrefetcher.take(shardId, nonce);
 
     return { shardId, currentNonce, lastProcessedNonce, nonce, transactionsResult };
   }
 
-  private async getShardTransactions(shardId: number, nonce: number): Promise<{ blockHash: string, transactions: ShardTransaction[] } | undefined> {
+  private async getShardTransactions(shardId: number, nonce: number): Promise<BlockTransactions | undefined> {
     const result = await this.gatewayGet<GatewayBlockResponse>(`block/${shardId}/by-nonce/${nonce}?withTxs=true`);
 
     if (!result || !result.block) {
@@ -401,7 +440,7 @@ export class TransactionProcessor {
       .map(ShardTransaction.build);
   }
 
-  private async getHyperblockTransactions(nonce: number): Promise<{ blockHash: string, transactions: ShardTransaction[] } | undefined> {
+  private async getHyperblockTransactions(nonce: number): Promise<BlockTransactions | undefined> {
     const result = await this.gatewayGet(`hyperblock/by-nonce/${nonce}`);
     if (!result) {
       return undefined;
